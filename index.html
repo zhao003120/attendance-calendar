@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>考勤日历 2026</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-title">
+        <h1>考勤日历</h1>
+        <p>2026年度 · 工作日 / 调休 / 假日 / 应出勤日一览</p>
+      </div>
+      <div class="header-right">
+        <div class="year-progress-mini">
+          <span class="ypm-item">第<span id="yp-week">--</span>周</span>
+          <span class="ypm-sep">·</span>
+          <span class="ypm-item">第<span id="yp-day">--</span>日</span>
+          <span class="ypm-sep">·</span>
+          <span class="ypm-item">剩余<span id="yp-remaining">--</span>天</span>
+        </div>
+        <span class="version-badge" id="app-version">v1.0.0</span>
+      </div>
+    </header>
+
+    <!-- Month stats bar -->
+    <div class="info-bar">
+      <div class="stat-pill primary filter" data-type="attendance" onclick="toggleFilter('attendance')">
+        <span class="stat-pill-value" id="stat-attendance">0</span>
+        <span class="stat-pill-label">应出勤日</span>
+      </div>
+      <div class="stat-pill filter" data-type="workday" onclick="toggleFilter('workday')">
+        <span class="stat-pill-value" id="stat-workday">0</span>
+        <span class="stat-pill-label">工作日</span>
+      </div>
+      <div class="stat-pill filter" data-type="holiday" onclick="toggleFilter('holiday')">
+        <span class="stat-pill-value" id="stat-holiday">0</span>
+        <span class="stat-pill-label">法定假日</span>
+      </div>
+      <div class="stat-pill filter" data-type="weekend" onclick="toggleFilter('weekend')">
+        <span class="stat-pill-value" id="stat-weekend">0</span>
+        <span class="stat-pill-label">休息日</span>
+      </div>
+      <div class="stat-pill filter" data-type="workmakeup" onclick="toggleFilter('workmakeup')">
+        <span class="stat-pill-value" id="stat-workmakeup">0</span>
+        <span class="stat-pill-label">调休上班</span>
+      </div>
+      <div class="stat-pill filter" data-type="all" onclick="toggleFilter('all')">
+        <span class="stat-pill-value" id="stat-total">0</span>
+        <span class="stat-pill-label">总天数</span>
+      </div>
+    </div>
+
+    <div class="main-layout">
+      <!-- ===== Calendar ===== -->
+      <section class="card calendar-card">
+        <div class="calendar-top">
+          <div class="cal-nav-left">
+            <button class="nav-btn" onclick="changeMonth(-1)" title="上一月">&#9664;</button>
+            <span id="current-month"></span>
+            <button class="nav-btn" onclick="changeMonth(1)" title="下一月">&#9654;</button>
+          </div>
+          <div class="cal-nav-right">
+            <span class="stat-month-label" id="stat-month"></span>
+            <button class="today-btn" onclick="goToToday()">返回今天</button>
+          </div>
+        </div>
+        <div class="week-header">
+          <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
+        </div>
+        <div id="calendar-grid"></div>
+      </section>
+
+      <!-- ===== Right info ===== -->
+      <aside class="side-panel">
+        <!-- Holiday summary -->
+        <div class="card holiday-card">
+          <h3>2026年法定节假日安排</h3>
+          <table class="holiday-table">
+            <thead>
+              <tr>
+                <th>节日</th>
+                <th>放假日期</th>
+                <th>天数</th>
+                <th>调休上班</th>
+              </tr>
+            </thead>
+            <tbody id="holiday-summary-body"></tbody>
+          </table>
+        </div>
+
+        <!-- Year stats -->
+        <div class="card year-card">
+          <h3>全年汇总</h3>
+          <div class="year-grid">
+            <div class="year-box">
+              <div class="year-value" id="stat-year-attendance">0</div>
+              <div class="year-label">应出勤日</div>
+            </div>
+            <div class="year-box">
+              <div class="year-value" id="stat-year-holiday">0</div>
+              <div class="year-label">法定假日</div>
+            </div>
+            <div class="year-box">
+              <div class="year-value" id="stat-year-workmakeup">0</div>
+              <div class="year-label">调休上班</div>
+            </div>
+            <div class="year-box">
+              <div class="year-value" id="stat-year-total">0</div>
+              <div class="year-label">全年天数</div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="js/holiday-data.js"></script>
+  <script src="js/calendar.js"></script>
+
+  <!-- Memo Drawer -->
+  <div class="modal-overlay" id="memo-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span class="modal-date" id="memo-date"></span>
+        <button class="modal-close" onclick="closeMemo()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-info" id="memo-day-info"></div>
+        <div id="memo-list"></div>
+        <button class="btn-add" onclick="startNewMemo()">+ 新增备忘</button>
+      </div>
+      <div class="modal-footer" id="memo-footer" style="display:none;">
+        <button class="btn-delete" onclick="cancelEditMemo()">取消</button>
+        <button class="btn-save" onclick="saveMemoItem()">保存</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

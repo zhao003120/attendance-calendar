@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  calendar:
+    build: .
+    container_name: attendance-calendar
+    ports:
+      - "6000:6000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SMTP_HOST=smtp.qq.com
+      - SMTP_PORT=465
+      - SMTP_USER=1206150621@qq.com
+      - SMTP_PASS=yeidimkstgxmbadd
+      - SMTP_FROM=1206150621@qq.com
+    restart: unless-stopped

@@ -1,0 +1,15 @@
+{
+  "name": "attendance-calendar",
+  "version": "1.5.0",
+  "description": "考勤日历 - 支持备忘和邮件提醒",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "nodemailer": "^6.9.7",
+    "node-cron": "^3.0.3"
+  }
+}

@@ -1,0 +1,4 @@
+node_modules
+data/memos.json
+.env
+.git
