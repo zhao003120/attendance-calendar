@@ -5,7 +5,7 @@ services:
     build: .
     container_name: attendance-calendar
     ports:
-      - "6000:6000"
+      - "8080:6000"
     volumes:
       - ./data:/app/data
     environment:
