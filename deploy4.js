@@ -1,0 +1,49 @@
+const { Client } = require('ssh2');
+const fs = require('fs');
+
+const HOST = '192.144.162.83';
+const USER = 'ubuntu';
+const PASS = 'Zhao@198950';
+const REMOTE_DIR = '/home/ubuntu/attendance-calendar';
+
+const conn = new Client();
+
+conn.on('ready', () => {
+  console.log('SSH connected!');
+  conn.sftp((err, sftp) => {
+    if (err) { console.log('SFTP err:', err.message); conn.end(); return; }
+
+    const files = [
+      ['js/holiday-data.js', `${REMOTE_DIR}/js/holiday-data.js`],
+    ];
+
+    let done = 0;
+    files.forEach(([local, remote]) => {
+      sftp.fastPut(local, remote, (err) => {
+        done++;
+        if (err) console.log(`upload ${local}: ${err.message}`);
+        else console.log(`uploaded ${local}`);
+        if (done === files.length) {
+          sftp.end();
+          const cmd = `cd ${REMOTE_DIR} && docker compose up -d --build 2>&1 && sleep 3 && curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:8080`;
+          conn.exec(cmd, (err, stream) => {
+            if (err) { console.log('exec err:', err.message); conn.end(); return; }
+            let out = '';
+            stream.on('data', d => out += d.toString());
+            stream.stderr.on('data', d => out += d.toString());
+            stream.on('close', () => {
+              console.log(out.slice(-500));
+              conn.end();
+            });
+          });
+        }
+      });
+    });
+  });
+});
+
+conn.on('error', err => console.log('SSH error:', err.message));
+
+conn.connect({
+  host: HOST, port: 22, username: USER, password: PASS, readyTimeout: 30000,
+});

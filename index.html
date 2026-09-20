@@ -120,6 +120,47 @@
 
   <script src="js/holiday-data.js"></script>
   <script src="js/calendar.js"></script>
+  <script src="js/ai-assistant.js"></script>
+
+  <!-- AI Floating Button -->
+  <button class="ai-fab" id="ai-fab" onclick="toggleAIChat()" title="智能备忘助手">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+      <path d="M2 17l10 5 10-5"/>
+      <path d="M2 12l10 5 10-5"/>
+    </svg>
+    <span class="ai-fab-badge">智能</span>
+  </button>
+
+  <!-- AI Chat Panel -->
+  <div class="ai-chat-panel" id="ai-chat-panel">
+    <div class="ai-chat-header">
+      <div class="ai-chat-title">
+        <span class="ai-chat-icon">智能</span>
+        <span>备忘助手</span>
+      </div>
+      <button class="ai-chat-close" onclick="toggleAIChat()">&times;</button>
+    </div>
+    <div class="ai-chat-body">
+      <div class="ai-messages" id="ai-messages"></div>
+      <div class="ai-chat-input-area">
+        <div class="ai-quick-chips">
+          <span class="quick-chip" onclick="document.getElementById('ai-input').value='10月1日到7日提醒我放假，邮箱1206150621@qq.com'">10月1日~7日放假</span>
+          <span class="quick-chip" onclick="document.getElementById('ai-input').value='明天提醒我开会'">明天开会</span>
+          <span class="quick-chip" onclick="document.getElementById('ai-input').value='工作日每天提醒打卡'">工作日打卡</span>
+        </div>
+        <div class="ai-input-row">
+          <input type="text" id="ai-input" class="ai-input" placeholder="输入备忘指令，如：10月1日提醒我放假" />
+          <button class="ai-send-btn" onclick="sendChatMessage()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Memo Drawer -->
   <div class="modal-overlay" id="memo-modal">
