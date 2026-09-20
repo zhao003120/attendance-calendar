@@ -3,6 +3,5 @@ data/memos.json
 .env
 *.log
 .DS_Store
-deploy.js
-deploy2.js
-check.js
+deploy*.js
+check*.js

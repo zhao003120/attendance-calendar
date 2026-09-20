@@ -47,53 +47,35 @@ async function sendChatMessage() {
   addChatMessage('user', text);
   input.value = '';
 
-  const result = parseMemoCommand(text);
+  // 显示"思考中"
+  addChatMessage('ai', '正在分析并创建备忘...');
 
-  if (!result.dates.length) {
-    addChatMessage('ai', '未能识别日期信息，请尝试类似格式：\n• 10月1日提醒我放假\n• 9月25日到27日每天提醒早起\n• 明天提醒我开会');
-    return;
+  try {
+    const res = await fetch('/api/ai-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text }),
+    });
+    const data = await res.json();
+
+    // 移除"正在分析"的占位消息
+    const container = document.getElementById('ai-messages');
+    container.removeChild(container.lastChild);
+    aiMessages.pop();
+
+    if (data.ok) {
+      addChatMessage('ai', data.reply);
+      await preloadMonthMemos(currentDate.getFullYear(), currentDate.getMonth());
+      refresh();
+    } else {
+      addChatMessage('ai', '创建失败：' + (data.error || '未知错误'));
+    }
+  } catch (err) {
+    const container = document.getElementById('ai-messages');
+    container.removeChild(container.lastChild);
+    aiMessages.pop();
+    addChatMessage('ai', '服务连接失败，请确保服务已启动。');
   }
-
-  if (!result.content) {
-    addChatMessage('ai', '请告诉我备忘的具体内容是什么？');
-    return;
-  }
-
-  addChatMessage('ai', `正在为您创建 ${result.dates.length} 条备忘...`);
-
-  let created = 0;
-  for (const date of result.dates) {
-    const dateKey = formatDateKey(date.getFullYear(), date.getMonth(), date.getDate());
-    await fetchMemo(dateKey);
-    const memos = getMemoSync(dateKey);
-    const memo = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      content: result.content,
-      email: result.email,
-      reminder: result.reminder,
-      reminderTime: result.reminderTime,
-    };
-    memos.push(memo);
-    await saveMemoToServer(dateKey, memos);
-    created++;
-  }
-
-  await preloadMonthMemos(currentDate.getFullYear(), currentDate.getMonth());
-  refresh();
-
-  const dateDesc = result.dates.length === 1
-    ? formatDateKey(result.dates[0].getFullYear(), result.dates[0].getMonth(), result.dates[0].getDate())
-    : `${formatDateKey(result.dates[0].getFullYear(), result.dates[0].getMonth(), result.dates[0].getDate())} ~ ${formatDateKey(result.dates[result.dates.length - 1].getFullYear(), result.dates[result.dates.length - 1].getMonth(), result.dates[result.dates.length - 1].getDate())}`;
-
-  let summary = `已创建 ${created} 条备忘\n日期：${dateDesc}\n内容：${result.content}`;
-  if (result.reminder && result.email) {
-    const timeLabel = result.reminderTime === 'eve' ? '前一天晚上 20:00'
-      : result.reminderTime === 'morning' ? '当天早上 08:00'
-      : result.reminderTime === 'both' ? '前一天晚上 + 当天早上' : '';
-    summary += `\n邮件提醒：${result.email}`;
-    if (timeLabel) summary += `（${timeLabel}）`;
-  }
-  addChatMessage('ai', summary);
 }
 
 function handleChatKeydown(e) {

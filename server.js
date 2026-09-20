@@ -179,6 +179,131 @@ app.listen(PORT, () => {
   console.log(`===== 考勤日历服务已启动 =====`);
   console.log(`地址: http://localhost:${PORT}`);
   console.log(`SMTP: ${SMTP_USER ? '已配置' : '未配置（邮件提醒不可用）'}`);
+  console.log(`DeepSeek AI: ${process.env.DEEPSEEK_API_KEY ? '已配置' : '未配置'}`);
   console.log(`提醒节点: 每天 08:00（当天提醒）, 20:00（前一晚提醒）`);
   console.log(`================================`);
+});
+
+// ===== DeepSeek AI Chat API =====
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
+const DEEPSEEK_BASE = process.env.DEEPSEEK_BASE || 'https://api.deepseek.com';
+
+const SYSTEM_PROMPT = `你是考勤日历的智能备忘助手。用户会用自然语言告诉你想创建备忘，你需要解析出结构化数据。
+
+当前日期：${new Date().toISOString().split('T')[0]}
+
+你需要返回JSON格式（严格遵守），包含一个 memos 数组，每个元素：
+{
+  "date": "YYYY-MM-DD",
+  "content": "备忘内容",
+  "email": "邮箱地址（没有则空字符串）",
+  "reminder": true/false,
+  "reminderTime": "morning" | "eve" | "both"
+}
+
+规则：
+- reminderTime: morning=当天早上08:00, eve=前一天晚上20:00, both=两个都发
+- 如果用户提到"提醒""通知""邮件"且提供了邮箱，reminder=true
+- 如果用户说"前一天""提前一天"提醒，reminderTime=eve
+- 如果用户说"都要"或同时提到前一天和当天，reminderTime=both
+- 默认 reminderTime=morning
+- 日期范围（如"9月25日到27日"）要展开为多天，每天一条
+- "工作日每天"展开为该年所有工作日
+- "每天"展开为未来30天
+- "每周X"展开为该年所有周X
+- "今天""明天""后天"转为具体日期
+- 只返回JSON，不要任何其他文字
+
+示例：
+用户: 10月1日提醒我放假，邮箱1206150621@qq.com
+返回: {"memos":[{"date":"2026-10-01","content":"放假","email":"1206150621@qq.com","reminder":true,"reminderTime":"morning"}]}
+
+用户: 9月25日到27日每天提醒早起
+返回: {"memos":[{"date":"2026-09-25","content":"早起","email":"","reminder":false,"reminderTime":"morning"},{"date":"2026-09-26","content":"早起","email":"","reminder":false,"reminderTime":"morning"},{"date":"2026-09-27","content":"早起","email":"","reminder":false,"reminderTime":"morning"}]}`;
+
+app.post('/api/ai-chat', async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.json({ ok: false, error: '消息为空' });
+
+  if (!DEEPSEEK_API_KEY) {
+    return res.json({ ok: false, error: 'DeepSeek API Key 未配置' });
+  }
+
+  try {
+    const response = await fetch(`${DEEPSEEK_BASE}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: message },
+        ],
+        temperature: 0.1,
+        max_tokens: 4096,
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('[DeepSeek] API error:', response.status, errText);
+      return res.json({ ok: false, error: `DeepSeek API 错误: ${response.status}` });
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content || '';
+
+    // 提取JSON
+    let jsonStr = content.trim();
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) jsonStr = jsonMatch[0];
+
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return res.json({ ok: false, error: 'AI返回格式异常', raw: content });
+    }
+
+    const memos = parsed.memos || [];
+    if (!memos.length) {
+      return res.json({ ok: true, created: 0, memos: [], reply: '未能识别出备忘信息，请尝试更明确的描述。' });
+    }
+
+    // 保存到数据文件
+    const allMemos = loadMemos();
+    let created = 0;
+    for (const m of memos) {
+      if (!m.date || !m.content) continue;
+      if (!allMemos[m.date]) allMemos[m.date] = [];
+      allMemos[m.date].push({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        content: m.content,
+        email: m.email || '',
+        reminder: m.reminder || false,
+        reminderTime: m.reminderTime || 'morning',
+      });
+      created++;
+    }
+    saveMemos(allMemos);
+
+    // 生成回复
+    const dateList = [...new Set(memos.map(m => m.date))];
+    let reply = `已创建 ${created} 条备忘\n`;
+    reply += `日期：${dateList.length === 1 ? dateList[0] : `${dateList[0]} ~ ${dateList[dateList.length - 1]}`}\n`;
+    reply += `内容：${memos[0].content}`;
+    if (memos[0].email && memos[0].reminder) {
+      const timeLabel = memos[0].reminderTime === 'eve' ? '前一天晚上 20:00'
+        : memos[0].reminderTime === 'both' ? '前一天晚上 + 当天早上' : '当天早上 08:00';
+      reply += `\n邮件提醒：${memos[0].email}（${timeLabel}）`;
+    }
+
+    res.json({ ok: true, created, memos, reply });
+  } catch (err) {
+    console.error('[DeepSeek] request error:', err.message);
+    res.json({ ok: false, error: '请求失败: ' + err.message });
+  }
 });
