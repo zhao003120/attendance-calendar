@@ -139,10 +139,18 @@
         <span class="ai-chat-icon">智能</span>
         <span>备忘助手</span>
       </div>
-      <button class="ai-chat-close" onclick="toggleAIChat()">&times;</button>
+      <div class="ai-chat-actions">
+        <button class="ai-chat-history-btn" onclick="showMemoHistory()" title="历史备忘">历史</button>
+        <button class="ai-chat-clear" onclick="clearChatHistory()" title="清空聊天">清空</button>
+        <button class="ai-chat-close" onclick="toggleAIChat()">&times;</button>
+      </div>
     </div>
     <div class="ai-chat-body">
       <div class="ai-messages" id="ai-messages"></div>
+      <div class="ai-history-panel" id="ai-history-panel">
+        <button class="ai-history-back" onclick="hideMemoHistory()">&larr; 返回对话</button>
+        <div id="ai-history-list"></div>
+      </div>
       <div class="ai-chat-input-area">
         <div class="ai-quick-chips">
           <span class="quick-chip" onclick="document.getElementById('ai-input').value='10月1日到7日提醒我放假，邮箱1206150621@qq.com'">10月1日~7日放假</span>
@@ -159,6 +167,17 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Version History Panel -->
+  <div class="ver-overlay" id="version-panel" onclick="if(event.target===this)closeVersionPanel()">
+    <div class="ver-panel">
+      <div class="ver-panel-header">
+        <span class="ver-panel-title">更新历史</span>
+        <button class="ver-panel-close" onclick="closeVersionPanel()">&times;</button>
+      </div>
+      <div class="ver-panel-body" id="version-list"></div>
     </div>
   </div>
 

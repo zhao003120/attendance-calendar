@@ -3,7 +3,52 @@
  * 版本：v2.0.0
  */
 
-const APP_VERSION = 'v2.0.0';
+const APP_VERSION = 'v3.0.0';
+
+const VERSION_HISTORY = [
+  { ver: 'v3.0.0', date: '2026-09-20', features: [
+    '接入 DeepSeek AI 大模型驱动智能备忘',
+    '自然语言创建备忘（单条/多条/日期范围/工作日/每周）',
+    'AI 自动解析日期、内容、邮箱、提醒时间',
+    'docker-compose 环境变量隔离密钥',
+  ]},
+  { ver: 'v2.2.0', date: '2026-09-18', features: [
+    '修正2026年节假日调休数据（国务院官方通知）',
+    '元旦增加1月4日调休上班',
+    '春节改为9天假期(2/15~2/23)',
+    '劳动节删除4月26日调休',
+    '9月20日标签修正为国庆调休',
+  ]},
+  { ver: 'v2.0.0', date: '2026-09-18', features: [
+    '抽屉式备忘面板（右侧滑入）',
+    '备忘列表支持新增/编辑/删除',
+    '邮件提醒定时发送（08:00 + 20:00）',
+    'Docker 容器化部署',
+    '立即发送测试邮件功能',
+  ]},
+  { ver: 'v1.5.0', date: '2026-09-18', features: [
+    '备忘改为列表模式（每天多条）',
+    '统计卡片底色与日历联动',
+    '总天数支持联动筛选',
+  ]},
+  { ver: 'v1.3.0', date: '2026-09-18', features: [
+    '点击日期添加备忘（弹窗形式）',
+    '备忘数据 localStorage 持久化',
+    '有备忘的日期显示绿点标记',
+  ]},
+  { ver: 'v1.2.0', date: '2026-09-18', features: [
+    '布局优化：统计卡片顶部横排',
+    '节假日表 badge 底色与日历统一',
+    '全年进度移至右侧面板',
+  ]},
+  { ver: 'v1.0.0', date: '2026-09-18', features: [
+    '月历视图（工作日/休息日/假日/调休四色标记）',
+    '统计卡片联动筛选日历',
+    '全年汇总（应出勤日/假日/调休/天数）',
+    '节假日安排表（7大节日）',
+    '周一首日 + 返回今天按钮',
+  ]},
+];
 
 const DAY_TYPES = {
   workday:    { label: '工作日',     short: '班', color: '#2563eb', bg: '#dbeafe' },
@@ -275,9 +320,14 @@ function refresh() {
 }
 
 async function init() {
-  document.getElementById('app-version').textContent = APP_VERSION;
+  const verEl = document.getElementById('app-version');
+  verEl.textContent = APP_VERSION;
+  verEl.style.cursor = 'pointer';
+  verEl.addEventListener('click', toggleVersionPanel);
+
   renderHolidaySummary();
   renderYearProgress();
+  renderVersionHistory();
 
   await preloadMonthMemos(currentDate.getFullYear(), currentDate.getMonth());
   refresh();
@@ -465,7 +515,7 @@ function showMemoForm(content, email, reminder, reminderTime) {
       <label class="modal-label">备忘内容</label>
       <textarea class="memo-textarea" id="memo-content" placeholder="输入备忘内容..." rows="3">${escapeHtml(content)}</textarea>
       <label class="modal-label">邮件提醒</label>
-      <input type="email" class="memo-email" id="memo-email" placeholder="输入邮箱地址" value="${escapeHtml(email)}" />
+      <input type="email" class="memo-email" id="memo-email" placeholder="输入邮箱地址" value="${escapeHtml(email || '1206150621@qq.com')}" />
       <label class="modal-check"><input type="checkbox" id="memo-reminder" ${reminder ? 'checked' : ''} /> 启用邮件提醒</label>
       <div id="reminder-time-wrap" style="display:${reminder ? 'block' : 'none'};margin-top:8px;">
         <label class="modal-label">提醒时间</label>
@@ -583,3 +633,31 @@ function escapeHtml(str) {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ===== Version History Panel =====
+function toggleVersionPanel() {
+  const panel = document.getElementById('version-panel');
+  panel.classList.toggle('show');
+}
+
+function closeVersionPanel() {
+  document.getElementById('version-panel').classList.remove('show');
+}
+
+function renderVersionHistory() {
+  const container = document.getElementById('version-list');
+  container.innerHTML = VERSION_HISTORY.map((v, i) => {
+    const isLatest = i === 0;
+    return `
+      <div class="ver-item ${isLatest ? 'ver-latest' : ''}">
+        <div class="ver-header">
+          <span class="ver-tag ${isLatest ? 'ver-tag-new' : ''}">${v.ver}</span>
+          <span class="ver-date">${v.date}</span>
+          ${isLatest ? '<span class="ver-badge-new">最新</span>' : ''}
+        </div>
+        <ul class="ver-features">
+          ${v.features.map(f => `<li>${f}</li>`).join('')}
+        </ul>
+      </div>`;
+  }).join('');
+}

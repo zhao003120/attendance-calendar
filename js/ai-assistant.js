@@ -1,10 +1,36 @@
 /**
  * AI 悬浮窗助手 - 自然语言添加备忘
  * 支持单条/多条备忘创建
+ * 聊天历史 localStorage 持久化
  */
 
 let aiChatOpen = false;
 let aiMessages = [];
+const AI_CHAT_STORAGE_KEY = 'ai_chat_history';
+
+function loadChatHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(AI_CHAT_STORAGE_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveChatHistory() {
+  try {
+    localStorage.setItem(AI_CHAT_STORAGE_KEY, JSON.stringify(aiMessages.slice(-100)));
+  } catch {}
+}
+
+function renderChatHistory() {
+  const container = document.getElementById('ai-messages');
+  container.innerHTML = '';
+  aiMessages.forEach(msg => {
+    const el = document.createElement('div');
+    el.className = `chat-msg chat-${msg.role}`;
+    el.innerHTML = `<div class="chat-bubble">${escapeChatHtml(msg.text)}</div>`;
+    container.appendChild(el);
+  });
+  container.scrollTop = container.scrollHeight;
+}
 
 function toggleAIChat() {
   const panel = document.getElementById('ai-chat-panel');
@@ -14,7 +40,12 @@ function toggleAIChat() {
     panel.classList.add('show');
     btn.classList.add('active');
     if (aiMessages.length === 0) {
-      addChatMessage('ai', '你好！我是智能备忘助手，可以用自然语言创建备忘。\n\n例如：\n• 10月1日提醒我放假，邮箱1206150621@qq.com\n• 9月25日到27日每天提醒早起\n• 明天提醒我开会\n• 工作日每天提醒打卡');
+      aiMessages = loadChatHistory();
+      if (aiMessages.length === 0) {
+        addChatMessage('ai', '你好！我是智能备忘助手，可以用自然语言创建备忘。\n\n例如：\n• 10月1日提醒我放假，邮箱1206150621@qq.com\n• 9月25日到27日每天提醒早起\n• 明天提醒我开会\n• 工作日每天提醒打卡');
+      } else {
+        renderChatHistory();
+      }
     }
     setTimeout(() => document.getElementById('ai-input').focus(), 300);
   } else {
@@ -25,6 +56,7 @@ function toggleAIChat() {
 
 function addChatMessage(role, text) {
   aiMessages.push({ role, text });
+  saveChatHistory();
   const container = document.getElementById('ai-messages');
   const msg = document.createElement('div');
   msg.className = `chat-msg chat-${role}`;
@@ -39,6 +71,13 @@ function escapeChatHtml(str) {
   return div.innerHTML.replace(/\n/g, '<br>');
 }
 
+function removeLastChatMessage() {
+  aiMessages.pop();
+  saveChatHistory();
+  const container = document.getElementById('ai-messages');
+  if (container.lastChild) container.removeChild(container.lastChild);
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('ai-input');
   const text = input.value.trim();
@@ -47,7 +86,6 @@ async function sendChatMessage() {
   addChatMessage('user', text);
   input.value = '';
 
-  // 显示"思考中"
   addChatMessage('ai', '正在分析并创建备忘...');
 
   try {
@@ -58,10 +96,7 @@ async function sendChatMessage() {
     });
     const data = await res.json();
 
-    // 移除"正在分析"的占位消息
-    const container = document.getElementById('ai-messages');
-    container.removeChild(container.lastChild);
-    aiMessages.pop();
+    removeLastChatMessage();
 
     if (data.ok) {
       addChatMessage('ai', data.reply);
@@ -71,11 +106,15 @@ async function sendChatMessage() {
       addChatMessage('ai', '创建失败：' + (data.error || '未知错误'));
     }
   } catch (err) {
-    const container = document.getElementById('ai-messages');
-    container.removeChild(container.lastChild);
-    aiMessages.pop();
+    removeLastChatMessage();
     addChatMessage('ai', '服务连接失败，请确保服务已启动。');
   }
+}
+
+function clearChatHistory() {
+  aiMessages = [];
+  localStorage.removeItem(AI_CHAT_STORAGE_KEY);
+  addChatMessage('ai', '聊天记录已清空。可以用自然语言创建备忘。\n\n例如：\n• 10月1日提醒我放假，邮箱1206150621@qq.com\n• 明天提醒我开会');
 }
 
 function handleChatKeydown(e) {
@@ -86,14 +125,7 @@ function handleChatKeydown(e) {
 }
 
 /**
- * 自然语言解析器
- * 支持格式：
- *   - 10月1日 / 10月1号
- *   - 9月25日到27日 / 9月25日至9月27日
- *   - 今天 / 明天 / 后天 / 大后天
- *   - 每天 / 工作日 / 周末
- *   - 邮箱提取
- *   - 提醒时间：前一天 / 当天 / 都要
+ * 自然语言解析器（备用，AI 不可用时前端兜底）
  */
 function parseMemoCommand(input) {
   const now = new Date();
@@ -114,14 +146,12 @@ function parseMemoCommand(input) {
 
   let dates = [];
 
-  // 1. 跨月日期范围：X月X日到Y月Y日
   const crossMonthRange = input.match(/(\d{1,2})月(\d{1,2})日?[到至](\d{1,2})月(\d{1,2})日?/);
   if (crossMonthRange) {
     const [, m1, d1, m2, d2] = crossMonthRange;
     dates = buildDateRange(year, parseInt(m1) - 1, parseInt(d1), parseInt(m2) - 1, parseInt(d2));
   }
 
-  // 2. 同月日期范围：X月X日到Y日
   if (!dates.length) {
     const sameMonthRange = input.match(/(\d{1,2})月(\d{1,2})日?[到至](\d{1,2})日?/);
     if (sameMonthRange) {
@@ -130,7 +160,6 @@ function parseMemoCommand(input) {
     }
   }
 
-  // 3. 多个独立日期：X月X日、Y月Y日
   if (!dates.length) {
     const multiDates = [...input.matchAll(/(\d{1,2})月(\d{1,2})日?/g)];
     if (multiDates.length) {
@@ -138,7 +167,6 @@ function parseMemoCommand(input) {
     }
   }
 
-  // 4. 相对日期
   if (!dates.length) {
     if (/今天|今日/.test(input)) dates.push(new Date(now));
     if (/明天|明日/.test(input)) dates.push(new Date(year, now.getMonth(), now.getDate() + 1));
@@ -147,7 +175,6 @@ function parseMemoCommand(input) {
     if (/昨天/.test(input)) dates.push(new Date(year, now.getMonth(), now.getDate() - 1));
   }
 
-  // 5. 每天 / 每日
   if (!dates.length && /每天|每日|天天/.test(input)) {
     const days = parseInt(input.match(/(\d+)天/)?.[1] || '30');
     const maxDays = Math.min(days, 90);
@@ -156,7 +183,6 @@ function parseMemoCommand(input) {
     }
   }
 
-  // 6. 工作日每天
   if (!dates.length && /工作日/.test(input) && /每天|每日|每天/.test(input)) {
     for (let i = 0; i < 365; i++) {
       const d = new Date(year, now.getMonth(), now.getDate() + i);
@@ -166,7 +192,6 @@ function parseMemoCommand(input) {
     }
   }
 
-  // 7. 周末每天
   if (!dates.length && /周末|休息日/.test(input) && /每天|每日/.test(input)) {
     for (let i = 0; i < 365; i++) {
       const d = new Date(year, now.getMonth(), now.getDate() + i);
@@ -176,7 +201,6 @@ function parseMemoCommand(input) {
     }
   }
 
-  // 8. 每周X
   if (!dates.length) {
     const weekDayMatch = input.match(/每周([一二三四五六日天])/);
     if (weekDayMatch) {
@@ -190,15 +214,12 @@ function parseMemoCommand(input) {
     }
   }
 
-  // 提取内容
   let content = input;
 
-  // 如果有冒号，取冒号后的内容
   const colonMatch = input.match(/[：:]\s*(.+)/);
   if (colonMatch) {
     content = colonMatch[1];
   } else {
-    // 移除已知模式
     content = content
       .replace(/(\d{1,2})月(\d{1,2})日?/g, '')
       .replace(/(\d{1,2})月/g, '')
@@ -217,7 +238,6 @@ function parseMemoCommand(input) {
       .trim();
   }
 
-  // 清理内容中的邮箱
   content = content.replace(/[\w.-]+@[\w.-]+\.\w+/g, '').trim();
 
   return {
@@ -240,6 +260,47 @@ function buildDateRange(year, m1, d1, m2, d2) {
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
+}
+
+async function showMemoHistory() {
+  document.getElementById('ai-messages').style.display = 'none';
+  document.querySelector('.ai-chat-input-area').style.display = 'none';
+  const panel = document.getElementById('ai-history-panel');
+  panel.classList.add('show');
+  const list = document.getElementById('ai-history-list');
+  list.innerHTML = '<div class="ai-history-empty">加载中...</div>';
+
+  try {
+    const res = await fetch('/api/memos');
+    const allMemos = await res.json();
+    const entries = Object.entries(allMemos).sort((a, b) => b[0].localeCompare(a[0]));
+
+    if (!entries.length) {
+      list.innerHTML = '<div class="ai-history-empty">暂无备忘记录</div>';
+      return;
+    }
+
+    list.innerHTML = entries.map(([date, memos]) => {
+      const items = memos.map(m => {
+        const tags = [];
+        if (m.email) tags.push(`📧 ${m.email}`);
+        if (m.reminder) tags.push(`🔔 ${m.reminderTime === 'both' ? '前一天+当天' : m.reminderTime === 'eve' ? '前一天' : '当天'}`);
+        return `<div class="ai-history-item">
+          <div class="ai-history-content">${escapeChatHtml(m.content || '(无内容)')}</div>
+          ${tags.length ? `<div class="ai-history-meta">${tags.join(' ')}</div>` : ''}
+        </div>`;
+      }).join('');
+      return `<div class="ai-history-date">${date}</div>${items}`;
+    }).join('');
+  } catch {
+    list.innerHTML = '<div class="ai-history-empty">加载失败，请确保服务已启动</div>';
+  }
+}
+
+function hideMemoHistory() {
+  document.getElementById('ai-messages').style.display = '';
+  document.querySelector('.ai-chat-input-area').style.display = '';
+  document.getElementById('ai-history-panel').classList.remove('show');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
