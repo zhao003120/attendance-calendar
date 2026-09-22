@@ -136,12 +136,32 @@ function parseMemoCommand(input) {
 
   const wantsReminder = /提醒|通知|邮件|发邮|邮箱/.test(input) || !!email;
 
-  let reminderTime = 'morning';
-  if (/前一天|前一晚|提前一天|晚上|前一日/.test(input)) {
-    reminderTime = 'eve';
+  let reminderTime = '08:00';
+  let reminderDaysBefore = 0;
+
+  const timeMatch = input.match(/(?:下午|傍晚)\s*(\d{1,2})\s*[点时:：](\d{0,2})/) ;
+  if (timeMatch) {
+    let hour = parseInt(timeMatch[1]);
+    const min = timeMatch[2] ? parseInt(timeMatch[2].padEnd(2, '0')) : 0;
+    if (/下午|傍晚/.test(input) && hour < 12) hour += 12;
+    reminderTime = `${String(hour).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  } else {
+    const directTimeMatch = input.match(/(\d{1,2}):(\d{2})/);
+    if (directTimeMatch) {
+      reminderTime = `${directTimeMatch[1].padStart(2, '0')}:${directTimeMatch[2]}`;
+    } else {
+      const hourMatch = input.match(/上午\s*(\d{1,2})\s*[点时]/);
+      if (hourMatch) {
+        reminderTime = `${hourMatch[1].padStart(2, '0')}:00`;
+      }
+    }
   }
-  if (/都要|两个都|前一天.*当天|当天.*前一天/.test(input)) {
-    reminderTime = 'both';
+
+  if (/前一天|前一晚|提前一天|前一日/.test(input)) {
+    reminderDaysBefore = 1;
+  }
+  if (/提前两天|前两天|提前二天/.test(input)) {
+    reminderDaysBefore = 2;
   }
 
   let dates = [];
@@ -229,8 +249,11 @@ function parseMemoCommand(input) {
       .replace(/每天|每日|天天|工作日|周末|休息日/g, '')
       .replace(/每周[一二三四五六日天]/g, '')
       .replace(/提醒|通知|邮件|发邮|邮箱/g, '')
-      .replace(/前一天|前一晚|提前一天|前一日|晚上/g, '')
+      .replace(/前一天|前一晚|提前一天|前一日|晚上|提前两天|前两天|提前二天/g, '')
       .replace(/当天|早上|都要|两个都/g, '')
+      .replace(/上午|下午|傍晚/g, '')
+      .replace(/\d{1,2}[:：]\d{2}/g, '')
+      .replace(/\d{1,2}\s*[点时]\d{0,2}/g, '')
       .replace(/[\w.-]+@[\w.-]+\.\w+/g, '')
       .replace(/[，。、：:帮我把添加设置安排请让代为记下记录个份]/g, ' ')
       .replace(/\d+天/g, '')
@@ -246,6 +269,7 @@ function parseMemoCommand(input) {
     email,
     reminder: wantsReminder && !!email,
     reminderTime,
+    reminderDaysBefore,
   };
 }
 
@@ -284,7 +308,13 @@ async function showMemoHistory() {
       const items = memos.map(m => {
         const tags = [];
         if (m.email) tags.push(`📧 ${m.email}`);
-        if (m.reminder) tags.push(`🔔 ${m.reminderTime === 'both' ? '前一天+当天' : m.reminderTime === 'eve' ? '前一天' : '当天'}`);
+        if (m.reminder) {
+          const rt = m.reminderTime || '';
+          const db = m.reminderDaysBefore || 0;
+          const dayLabel = db === 0 ? '当天' : `提前${db}天`;
+          const timeStr = rt.includes(':') ? rt : (rt === 'eve' ? '20:00' : rt === 'both' ? '08:00+20:00' : '08:00');
+          tags.push(`🔔 ${dayLabel} ${timeStr}`);
+        }
         return `<div class="ai-history-item">
           <div class="ai-history-content">${escapeChatHtml(m.content || '(无内容)')}</div>
           ${tags.length ? `<div class="ai-history-meta">${tags.join(' ')}</div>` : ''}

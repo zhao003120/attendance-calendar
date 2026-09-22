@@ -130,7 +130,7 @@ async function sendReminderEmail(to, subject, text) {
   }
 }
 
-// ===== Cron: 每天早上 8:00 和前一天晚上 20:00 检查 =====
+// ===== Cron: 每分钟检查自定义提醒时间 =====
 function getDateKey(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -138,41 +138,63 @@ function getDateKey(date) {
   return `${y}-${m}-${d}`;
 }
 
-// 每天晚上 20:00 检查明天的备忘（提前提醒）
-cron.schedule('0 20 * * *', async () => {
-  console.log('[CRON] 运行前一晚提醒检查...');
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateKey = getDateKey(tomorrow);
-  const data = loadMemos();
-  const memos = data[dateKey] || [];
-  for (const m of memos) {
-    if (m.reminder && m.email && m.reminderTime === 'eve') {
-      await sendReminderEmail(
-        m.email,
-        `明日备忘提醒 - ${dateKey}`,
-        `明天(${dateKey})您有以下备忘：\n\n${m.content}`
-      );
-    }
+function normalizeReminderTime(m) {
+  const rt = m.reminderTime;
+  if (rt === 'morning' || !rt) return { time: '08:00', daysBefore: 0 };
+  if (rt === 'eve') return { time: '20:00', daysBefore: 1 };
+  if (rt === 'both') return [{ time: '08:00', daysBefore: 0 }, { time: '20:00', daysBefore: 1 }];
+  if (typeof rt === 'string' && rt.includes(':')) {
+    return { time: rt, daysBefore: m.reminderDaysBefore || 0 };
   }
-});
+  return { time: '08:00', daysBefore: 0 };
+}
 
-// 每天早上 8:00 检查今天的备忘（当天提醒）
-cron.schedule('0 8 * * *', async () => {
-  console.log('[CRON] 运行当天早上提醒检查...');
-  const today = new Date();
-  const dateKey = getDateKey(today);
-  const data = loadMemos();
-  const memos = data[dateKey] || [];
-  for (const m of memos) {
-    if (m.reminder && m.email && (m.reminderTime === 'morning' || !m.reminderTime)) {
-      await sendReminderEmail(
-        m.email,
-        `今日备忘提醒 - ${dateKey}`,
-        `今天(${dateKey})您有以下备忘：\n\n${m.content}`
-      );
+const sentReminders = new Set();
+function cleanSentReminders() {
+  if (sentReminders.size > 10000) sentReminders.clear();
+}
+
+cron.schedule('* * * * *', async () => {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const currentTime = `${hh}:${mm}`;
+  const allMemos = loadMemos();
+
+  for (const [dateKey, memos] of Object.entries(allMemos)) {
+    for (const m of memos) {
+      if (!m.reminder || !m.email) continue;
+
+      const normalized = normalizeReminderTime(m);
+      const entries = Array.isArray(normalized) ? normalized : [normalized];
+
+      for (const { time, daysBefore } of entries) {
+        if (time !== currentTime) continue;
+
+        const targetDate = new Date(now);
+        targetDate.setDate(targetDate.getDate() + daysBefore);
+        const targetKey = getDateKey(targetDate);
+
+        if (targetKey !== dateKey) continue;
+
+        const sentKey = `${dateKey}_${m.id}_${time}_${daysBefore}_${now.toDateString()}`;
+        if (sentReminders.has(sentKey)) continue;
+
+        const isAdvance = daysBefore > 0;
+        const subject = isAdvance
+          ? `备忘提醒 - ${dateKey}（提前${daysBefore}天）`
+          : `备忘提醒 - ${dateKey}`;
+        const text = isAdvance
+          ? `${dateKey}您有以下备忘（提前${daysBefore}天提醒）：\n\n${m.content}`
+          : `${dateKey}您有以下备忘：\n\n${m.content}`;
+
+        console.log(`[CRON] 发送提醒: ${m.email} | ${dateKey} | ${time} | 提前${daysBefore}天`);
+        await sendReminderEmail(m.email, subject, text);
+        sentReminders.add(sentKey);
+      }
     }
   }
+  cleanSentReminders();
 });
 
 app.listen(PORT, () => {
@@ -180,7 +202,7 @@ app.listen(PORT, () => {
   console.log(`地址: http://localhost:${PORT}`);
   console.log(`SMTP: ${SMTP_USER ? '已配置' : '未配置（邮件提醒不可用）'}`);
   console.log(`DeepSeek AI: ${process.env.DEEPSEEK_API_KEY ? '已配置' : '未配置'}`);
-  console.log(`提醒节点: 每天 08:00（当天提醒）, 20:00（前一晚提醒）`);
+  console.log(`提醒节点: 每分钟检查自定义时间触发`);
   console.log(`================================`);
 });
 
@@ -198,15 +220,19 @@ const SYSTEM_PROMPT = `你是考勤日历的智能备忘助手。用户会用自
   "content": "备忘内容",
   "email": "邮箱地址（没有则空字符串）",
   "reminder": true/false,
-  "reminderTime": "morning" | "eve" | "both"
+  "reminderTime": "HH:MM",
+  "reminderDaysBefore": 0
 }
 
 规则：
-- reminderTime: morning=当天早上08:00, eve=前一天晚上20:00, both=两个都发
+- reminderTime: 24小时制时间字符串，如 "08:00"、"20:30"、"14:00"
+- reminderDaysBefore: 提前几天，0=当天提醒，1=前一天提醒，2=前两天提醒
+- 如果用户提到具体时间如"下午3点""15:00"，直接用该时间
+- 如果用户说"前一天""提前一天"，reminderDaysBefore=1
+- 如果用户说"提前两天"，reminderDaysBefore=2
+- 如果用户说"都要""前一天和当天"，只返回一条，reminderDaysBefore=0，reminderTime设为当天默认时间
+- 默认 reminderTime="08:00", reminderDaysBefore=0
 - 如果用户提到"提醒""通知""邮件"且提供了邮箱，reminder=true
-- 如果用户说"前一天""提前一天"提醒，reminderTime=eve
-- 如果用户说"都要"或同时提到前一天和当天，reminderTime=both
-- 默认 reminderTime=morning
 - 日期范围（如"9月25日到27日"）要展开为多天，每天一条
 - "工作日每天"展开为该年所有工作日
 - "每天"展开为未来30天
@@ -215,11 +241,14 @@ const SYSTEM_PROMPT = `你是考勤日历的智能备忘助手。用户会用自
 - 只返回JSON，不要任何其他文字
 
 示例：
-用户: 10月1日提醒我放假，邮箱1206150621@qq.com
-返回: {"memos":[{"date":"2026-10-01","content":"放假","email":"1206150621@qq.com","reminder":true,"reminderTime":"morning"}]}
+用户: 10月1日下午3点提醒我放假，邮箱1206150621@qq.com
+返回: {"memos":[{"date":"2026-10-01","content":"放假","email":"1206150621@qq.com","reminder":true,"reminderTime":"15:00","reminderDaysBefore":0}]}
+
+用户: 10月1日提前一天晚上8点提醒我放假，邮箱1206150621@qq.com
+返回: {"memos":[{"date":"2026-10-01","content":"放假","email":"1206150621@qq.com","reminder":true,"reminderTime":"20:00","reminderDaysBefore":1}]}
 
 用户: 9月25日到27日每天提醒早起
-返回: {"memos":[{"date":"2026-09-25","content":"早起","email":"","reminder":false,"reminderTime":"morning"},{"date":"2026-09-26","content":"早起","email":"","reminder":false,"reminderTime":"morning"},{"date":"2026-09-27","content":"早起","email":"","reminder":false,"reminderTime":"morning"}]}`;
+返回: {"memos":[{"date":"2026-09-25","content":"早起","email":"","reminder":false,"reminderTime":"08:00","reminderDaysBefore":0},{"date":"2026-09-26","content":"早起","email":"","reminder":false,"reminderTime":"08:00","reminderDaysBefore":0},{"date":"2026-09-27","content":"早起","email":"","reminder":false,"reminderTime":"08:00","reminderDaysBefore":0}]}`;
 
 app.post('/api/ai-chat', async (req, res) => {
   const { message } = req.body;
@@ -284,7 +313,8 @@ app.post('/api/ai-chat', async (req, res) => {
         content: m.content,
         email: m.email || '',
         reminder: m.reminder || false,
-        reminderTime: m.reminderTime || 'morning',
+        reminderTime: m.reminderTime || '08:00',
+        reminderDaysBefore: m.reminderDaysBefore || 0,
       });
       created++;
     }
@@ -296,9 +326,10 @@ app.post('/api/ai-chat', async (req, res) => {
     reply += `日期：${dateList.length === 1 ? dateList[0] : `${dateList[0]} ~ ${dateList[dateList.length - 1]}`}\n`;
     reply += `内容：${memos[0].content}`;
     if (memos[0].email && memos[0].reminder) {
-      const timeLabel = memos[0].reminderTime === 'eve' ? '前一天晚上 20:00'
-        : memos[0].reminderTime === 'both' ? '前一天晚上 + 当天早上' : '当天早上 08:00';
-      reply += `\n邮件提醒：${memos[0].email}（${timeLabel}）`;
+      const rt = memos[0].reminderTime || '08:00';
+      const db = memos[0].reminderDaysBefore || 0;
+      const dayLabel = db === 0 ? '当天' : `提前${db}天`;
+      reply += `\n邮件提醒：${memos[0].email}（${dayLabel} ${rt}）`;
     }
 
     res.json({ ok: true, created, memos, reply });

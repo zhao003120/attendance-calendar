@@ -3,9 +3,20 @@
  * 版本：v2.0.0
  */
 
-const APP_VERSION = 'v3.0.0';
+const APP_VERSION = 'v3.2.0';
 
 const VERSION_HISTORY = [
+  { ver: 'v3.2.0', date: '2026-09-22', features: [
+    '备忘提醒支持自定义时间（精确到分钟）',
+    '支持提前N天提醒（0=当天、1=前一天、2=前两天…）',
+    '去除固定枚举限制，cron 每分钟检查触发',
+    '兼容旧数据自动转换',
+  ]},
+  { ver: 'v3.1.0', date: '2026-09-20', features: [
+    '历史备忘面板（按日期分组展示）',
+    '聊天记录 localStorage 持久化',
+    '邮箱默认填充',
+  ]},
   { ver: 'v3.0.0', date: '2026-09-20', features: [
     '接入 DeepSeek AI 大模型驱动智能备忘',
     '自然语言创建备忘（单条/多条/日期范围/工作日/每周）',
@@ -421,6 +432,25 @@ function getMemoSync(dateKey) {
   return Array.isArray(memoCache[dateKey]) ? memoCache[dateKey] : [];
 }
 
+function normalizeReminder(m) {
+  if (!m.reminder) return { time: '', daysBefore: 0 };
+  const rt = m.reminderTime;
+  if (rt === 'morning' || !rt) return { time: '08:00', daysBefore: 0 };
+  if (rt === 'eve') return { time: '20:00', daysBefore: 1 };
+  if (rt === 'both') return { time: '08:00', daysBefore: 0 };
+  if (typeof rt === 'string' && rt.includes(':')) {
+    return { time: rt, daysBefore: m.reminderDaysBefore || 0 };
+  }
+  return { time: '08:00', daysBefore: 0 };
+}
+
+function formatReminderLabel(m) {
+  if (!m.reminder) return '';
+  const { time, daysBefore } = normalizeReminder(m);
+  const dayLabel = daysBefore === 0 ? '当天' : `提前${daysBefore}天`;
+  return `${dayLabel} ${time}`;
+}
+
 let currentMemoKey = null;
 let editingMemoId = null;
 
@@ -450,14 +480,14 @@ function renderMemoList() {
 
   let html = '<div class="memo-list">';
   memos.forEach(m => {
-    const timeLabel = m.reminderTime === 'eve' ? '前一晚 20:00' : m.reminderTime === 'morning' ? '当天 08:00' : m.reminderTime === 'both' ? '前一晚+当天' : '';
+    const timeLabel = formatReminderLabel(m);
     html += `
       <div class="memo-item">
         <div class="memo-item-body">
           <div class="memo-item-content">${escapeHtml(m.content)}</div>
           <div class="memo-item-meta">
             ${m.email ? `<span class="memo-item-email">📧 ${escapeHtml(m.email)}</span>` : ''}
-            ${m.reminder ? `<span class="memo-item-badge">🔔 邮件提醒${timeLabel ? ' · ' + timeLabel : ''}</span>` : ''}
+            ${m.reminder ? `<span class="memo-item-badge">🔔 ${timeLabel}</span>` : ''}
           </div>
         </div>
         <div class="memo-item-actions">
@@ -472,7 +502,7 @@ function renderMemoList() {
 
 function startNewMemo() {
   editingMemoId = null;
-  showMemoForm('', '', false, 'morning');
+  showMemoForm('', '', false, '08:00', 0);
 }
 
 function startEditMemo(id) {
@@ -480,10 +510,11 @@ function startEditMemo(id) {
   const m = memos.find(x => x.id === id);
   if (!m) return;
   editingMemoId = id;
-  showMemoForm(m.content, m.email, m.reminder, m.reminderTime || 'morning');
+  const { time, daysBefore } = normalizeReminder(m);
+  showMemoForm(m.content, m.email, m.reminder, time, daysBefore);
 }
 
-function showMemoForm(content, email, reminder, reminderTime) {
+function showMemoForm(content, email, reminder, reminderTime, daysBefore) {
   const container = document.getElementById('memo-list');
   const memos = getMemoSync(currentMemoKey).filter(m => m.id !== editingMemoId);
 
@@ -491,14 +522,14 @@ function showMemoForm(content, email, reminder, reminderTime) {
   if (memos.length) {
     html = '<div class="memo-list">';
     memos.forEach(m => {
-      const timeLabel = m.reminderTime === 'eve' ? '前一晚 20:00' : m.reminderTime === 'morning' ? '当天 08:00' : m.reminderTime === 'both' ? '前一晚+当天' : '';
+      const timeLabel = formatReminderLabel(m);
       html += `
         <div class="memo-item">
           <div class="memo-item-body">
             <div class="memo-item-content">${escapeHtml(m.content)}</div>
             <div class="memo-item-meta">
               ${m.email ? `<span class="memo-item-email">📧 ${escapeHtml(m.email)}</span>` : ''}
-              ${m.reminder ? `<span class="memo-item-badge">🔔 邮件提醒${timeLabel ? ' · ' + timeLabel : ''}</span>` : ''}
+              ${m.reminder ? `<span class="memo-item-badge">🔔 ${timeLabel}</span>` : ''}
             </div>
           </div>
           <div class="memo-item-actions">
@@ -510,6 +541,9 @@ function showMemoForm(content, email, reminder, reminderTime) {
     html += '</div>';
   }
 
+  const reminderTimeVal = typeof reminderTime === 'string' && reminderTime.includes(':') ? reminderTime : '08:00';
+  const daysBeforeVal = typeof daysBefore === 'number' ? daysBefore : 0;
+
   html += `
     <div class="memo-form" id="memo-form">
       <label class="modal-label">备忘内容</label>
@@ -519,11 +553,18 @@ function showMemoForm(content, email, reminder, reminderTime) {
       <label class="modal-check"><input type="checkbox" id="memo-reminder" ${reminder ? 'checked' : ''} /> 启用邮件提醒</label>
       <div id="reminder-time-wrap" style="display:${reminder ? 'block' : 'none'};margin-top:8px;">
         <label class="modal-label">提醒时间</label>
-        <select class="memo-select" id="memo-reminder-time">
-          <option value="morning" ${reminderTime === 'morning' ? 'selected' : ''}>当天早上 08:00</option>
-          <option value="eve" ${reminderTime === 'eve' ? 'selected' : ''}>前一天晚上 20:00</option>
-          <option value="both" ${reminderTime === 'both' ? 'selected' : ''}>前一天晚上 + 当天早上</option>
-        </select>
+        <div class="reminder-time-row">
+          <div class="reminder-field">
+            <span class="reminder-field-label">提前</span>
+            <input type="number" id="memo-days-before" class="memo-input-number" min="0" max="30" value="${daysBeforeVal}" />
+            <span class="reminder-field-label">天</span>
+          </div>
+          <div class="reminder-field">
+            <span class="reminder-field-label">时间</span>
+            <input type="time" id="memo-reminder-time" class="memo-input-time" value="${reminderTimeVal}" />
+          </div>
+        </div>
+        <div class="reminder-hint">0天=当天提醒，1天=前一天提醒，2天=前两天提醒…</div>
       </div>
       <button class="btn-send-now" id="btn-send-now" onclick="sendTestEmail()" style="display:${reminder ? 'block' : 'none'};">立即发送测试邮件</button>
     </div>`;
@@ -549,8 +590,11 @@ async function saveMemoItem() {
   const email = document.getElementById('memo-email').value.trim();
   const reminder = document.getElementById('memo-reminder').checked;
   const reminderTime = document.getElementById('memo-reminder-time')
-    ? document.getElementById('memo-reminder-time').value
-    : 'morning';
+    ? document.getElementById('memo-reminder-time').value || '08:00'
+    : '08:00';
+  const reminderDaysBefore = document.getElementById('memo-days-before')
+    ? parseInt(document.getElementById('memo-days-before').value) || 0
+    : 0;
 
   if (!content) {
     alert('请输入备忘内容');
@@ -564,9 +608,9 @@ async function saveMemoItem() {
   const memos = getMemoSync(currentMemoKey);
   if (editingMemoId) {
     const idx = memos.findIndex(m => m.id === editingMemoId);
-    if (idx >= 0) memos[idx] = { ...memos[idx], content, email, reminder, reminderTime };
+    if (idx >= 0) memos[idx] = { ...memos[idx], content, email, reminder, reminderTime, reminderDaysBefore };
   } else {
-    memos.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), content, email, reminder, reminderTime });
+    memos.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), content, email, reminder, reminderTime, reminderDaysBefore });
   }
 
   await saveMemoToServer(currentMemoKey, memos);

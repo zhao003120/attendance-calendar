@@ -539,6 +539,30 @@ body {
   color: var(--text); background: #fff; cursor: pointer; transition: border 0.2s;
 }
 .memo-select:focus { outline: none; border-color: var(--blue-light); }
+.reminder-time-row {
+  display: flex; gap: 12px; align-items: center; margin-top: 4px;
+}
+.reminder-field {
+  display: flex; align-items: center; gap: 6px;
+}
+.reminder-field-label {
+  font-size: 12px; color: var(--text-muted); white-space: nowrap;
+}
+.memo-input-number {
+  width: 54px; border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 6px 8px; font-size: 13px; font-family: inherit;
+  color: var(--text); background: #fff; text-align: center; transition: border 0.2s;
+}
+.memo-input-number:focus { outline: none; border-color: var(--blue-light); }
+.memo-input-time {
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 13px; font-family: inherit;
+  color: var(--text); background: #fff; transition: border 0.2s;
+}
+.memo-input-time:focus { outline: none; border-color: var(--blue-light); }
+.reminder-hint {
+  font-size: 11px; color: var(--text-light); margin-top: 6px;
+}
 .btn-send-now {
   width: 100%; margin-top: 12px;
   padding: 9px; border: 1.5px solid var(--green);
