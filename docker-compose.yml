@@ -15,4 +15,5 @@ services:
       - SMTP_PASS=yeidimkstgxmbadd
       - SMTP_FROM=1206150621@qq.com
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - TZ=Asia/Shanghai
     restart: unless-stopped

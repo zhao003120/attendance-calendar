@@ -1,5 +1,8 @@
 FROM node:18-alpine
 
+RUN apk add --no-cache tzdata
+ENV TZ=Asia/Shanghai
+
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
