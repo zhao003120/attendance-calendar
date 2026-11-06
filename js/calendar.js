@@ -83,6 +83,15 @@ let activeFilter = null;
 
 function pad2(n) { return String(n).padStart(2, '0'); }
 
+function getLunarLabel(year, month, day) {
+  if (typeof Solar === 'undefined') return '';
+  const lunar = Solar.fromYmd(year, month + 1, day).getLunar();
+  const lunarDay = lunar.getDayInChinese();
+  return lunarDay === '初一'
+    ? `${lunar.getMonthInChinese()}月${lunarDay}`
+    : lunarDay;
+}
+
 function formatDateKey(year, month, day) {
   return `${year}-${pad2(month + 1)}-${pad2(day)}`;
 }
@@ -185,9 +194,11 @@ function renderCalendar(year, month) {
     if (info.isToday) cell.classList.add('today');
 
     const typeMeta = DAY_TYPES[info.type];
+    const lunarLabel = getLunarLabel(year, month, d);
 
     cell.innerHTML = `
       <div class="day-num">${d}</div>
+      <div class="day-lunar">${lunarLabel}</div>
       <div class="day-badge">${typeMeta.short}</div>
       ${info.label ? `<div class="day-label">${info.label}</div>` : ''}
     `;

@@ -8,6 +8,7 @@ const REMOTE_DIR = '/home/ubuntu/attendance-calendar';
 const files = [
   ['index.html', `${REMOTE_DIR}/index.html`],
   ['css/style.css', `${REMOTE_DIR}/css/style.css`],
+  ['js/lunar.js', `${REMOTE_DIR}/js/lunar.js`],
   ['js/ai-assistant.js', `${REMOTE_DIR}/js/ai-assistant.js`],
   ['js/calendar.js', `${REMOTE_DIR}/js/calendar.js`],
   ['js/holiday-data.js', `${REMOTE_DIR}/js/holiday-data.js`],
