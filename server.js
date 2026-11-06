@@ -32,6 +32,7 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+const DEFAULT_EMAIL = process.env.DEFAULT_EMAIL || SMTP_USER;
 
 function loadMemos() {
   try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8')); }
@@ -311,7 +312,7 @@ app.post('/api/ai-chat', async (req, res) => {
       allMemos[m.date].push({
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         content: m.content,
-        email: m.email || '',
+        email: m.email || DEFAULT_EMAIL,
         reminder: m.reminder || false,
         reminderTime: m.reminderTime || '08:00',
         reminderDaysBefore: m.reminderDaysBefore || 0,

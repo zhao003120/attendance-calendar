@@ -1,6 +1,6 @@
 /**
- * 2026年中国法定节假日及调休数据
- * 数据来源：国务院办公厅关于2026年部分节假日安排的通知
+ * 中国法定节假日及调休数据
+ * 数据来源：国务院办公厅关于各年度部分节假日安排的通知
  * https://www.gov.cn/zhengce/zhengceku/202511/content_7047091.htm
  *
  * 日类型说明：
@@ -83,6 +83,68 @@ const HOLIDAY_SUMMARIES = [
   { name: '国庆节', dates: '10月1日~10月7日',  days: 7, makeup: '9月20日、10月10日' },
 ];
 
+// ===== 2027年 =====
+// 元旦：1月1日(周五)~1月3日(周日)，无调休
+HOLIDAY_DATA['2027-01-01'] = { type: 'holiday', name: '元旦' };
+HOLIDAY_DATA['2027-01-02'] = { type: 'holiday', name: '元旦' };
+HOLIDAY_DATA['2027-01-03'] = { type: 'holiday', name: '元旦' };
+
+// 春节：2月5日(周五，除夕)~2月13日(周六)，调休1月31日、2月14日
+HOLIDAY_DATA['2027-01-31'] = { type: 'workmakeup', name: '春节调休上班' };
+HOLIDAY_DATA['2027-02-05'] = { type: 'holiday', name: '春节（除夕）' };
+HOLIDAY_DATA['2027-02-06'] = { type: 'holiday', name: '春节（正月初一）' };
+HOLIDAY_DATA['2027-02-07'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-08'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-09'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-10'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-11'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-12'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-13'] = { type: 'holiday', name: '春节' };
+HOLIDAY_DATA['2027-02-14'] = { type: 'workmakeup', name: '春节调休上班' };
+
+// 清明节：4月3日(周六)~4月5日(周一)，无调休
+HOLIDAY_DATA['2027-04-03'] = { type: 'holiday', name: '清明节' };
+HOLIDAY_DATA['2027-04-04'] = { type: 'holiday', name: '清明节' };
+HOLIDAY_DATA['2027-04-05'] = { type: 'holiday', name: '清明节' };
+
+// 劳动节：5月1日(周六)~5月5日(周三)，调休5月8日
+HOLIDAY_DATA['2027-05-01'] = { type: 'holiday', name: '劳动节' };
+HOLIDAY_DATA['2027-05-02'] = { type: 'holiday', name: '劳动节' };
+HOLIDAY_DATA['2027-05-03'] = { type: 'holiday', name: '劳动节' };
+HOLIDAY_DATA['2027-05-04'] = { type: 'holiday', name: '劳动节' };
+HOLIDAY_DATA['2027-05-05'] = { type: 'holiday', name: '劳动节' };
+HOLIDAY_DATA['2027-05-08'] = { type: 'workmakeup', name: '劳动节调休上班' };
+
+// 端午节：6月9日(周三)
+HOLIDAY_DATA['2027-06-09'] = { type: 'holiday', name: '端午节' };
+
+// 中秋节：9月15日(周三)
+HOLIDAY_DATA['2027-09-15'] = { type: 'holiday', name: '中秋节' };
+
+// 国庆节：10月1日(周五)~10月7日(周四)，调休9月26日、10月9日
+HOLIDAY_DATA['2027-09-26'] = { type: 'workmakeup', name: '国庆调休上班' };
+HOLIDAY_DATA['2027-10-01'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-02'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-03'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-04'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-05'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-06'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-07'] = { type: 'holiday', name: '国庆节' };
+HOLIDAY_DATA['2027-10-09'] = { type: 'workmakeup', name: '国庆调休上班' };
+
+const HOLIDAY_SUMMARIES_BY_YEAR = {
+  2026: HOLIDAY_SUMMARIES,
+  2027: [
+    { name: '元旦', dates: '1月1日~1月3日', days: 3, makeup: '无' },
+    { name: '春节', dates: '2月5日~2月13日', days: 9, makeup: '1月31日、2月14日' },
+    { name: '清明节', dates: '4月3日~4月5日', days: 3, makeup: '无' },
+    { name: '劳动节', dates: '5月1日~5月5日', days: 5, makeup: '5月8日' },
+    { name: '端午节', dates: '6月9日', days: 1, makeup: '无' },
+    { name: '中秋节', dates: '9月15日', days: 1, makeup: '无' },
+    { name: '国庆节', dates: '10月1日~10月7日', days: 7, makeup: '9月26日、10月9日' },
+  ],
+};
+
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { HOLIDAY_DATA, HOLIDAY_SUMMARIES };
+  module.exports = { HOLIDAY_DATA, HOLIDAY_SUMMARIES, HOLIDAY_SUMMARIES_BY_YEAR };
 }

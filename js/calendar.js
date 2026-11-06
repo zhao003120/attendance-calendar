@@ -6,6 +6,11 @@
 const APP_VERSION = 'v3.2.0';
 
 const VERSION_HISTORY = [
+  { ver: 'v3.3.0', date: '2026-11-06', features: [
+    '智能助手创建备忘自动带入默认邮箱',
+    '智能助手创建备忘后立即刷新日历显示',
+    '新增2027年法定节假日及调休安排',
+  ]},
   { ver: 'v3.2.0', date: '2026-09-22', features: [
     '备忘提醒支持自定义时间（精确到分钟）',
     '支持提前N天提醒（0=当天、1=前一天、2=前两天…）',
@@ -222,10 +227,13 @@ function renderStats(year, month) {
   document.getElementById('stat-year-total').textContent = yearStats.totalDays;
 }
 
-function renderHolidaySummary() {
+function renderHolidaySummary(year = currentDate.getFullYear()) {
   const tbody = document.getElementById('holiday-summary-body');
+  const title = document.getElementById('holiday-summary-title');
+  const summaries = HOLIDAY_SUMMARIES_BY_YEAR[year] || [];
+  if (title) title.textContent = `${year}年法定节假日安排`;
   tbody.innerHTML = '';
-  HOLIDAY_SUMMARIES.forEach(h => {
+  summaries.forEach(h => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${h.name}</td>
@@ -239,6 +247,8 @@ function renderHolidaySummary() {
 
 function updateHeader(year, month) {
   document.getElementById('current-month').textContent = `${year}年 ${MONTH_LABELS[month]}`;
+  const yearLabel = document.getElementById('app-year-label');
+  if (yearLabel) yearLabel.textContent = `${year}年度 · 工作日 / 调休 / 假日 / 应出勤日一览`;
 }
 
 async function changeMonth(delta) {
@@ -325,6 +335,7 @@ function refresh() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   updateHeader(year, month);
+  renderHolidaySummary(year);
   renderCalendar(year, month);
   renderStats(year, month);
   applyFilter();

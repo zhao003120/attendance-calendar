@@ -100,6 +100,10 @@ async function sendChatMessage() {
 
     if (data.ok) {
       addChatMessage('ai', data.reply);
+      // AI 写入服务端后，清除受影响日期的旧缓存，确保日历立即显示新备忘。
+      (data.memos || []).forEach(memo => {
+        if (memo.date) delete memoCache[memo.date];
+      });
       await preloadMonthMemos(currentDate.getFullYear(), currentDate.getMonth());
       refresh();
     } else {
