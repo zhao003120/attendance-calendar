@@ -234,6 +234,7 @@ const SYSTEM_PROMPT = `你是考勤日历的智能备忘助手。用户会用自
 - 如果用户说"都要""前一天和当天"，只返回一条，reminderDaysBefore=0，reminderTime设为当天默认时间
 - 默认 reminderTime="08:00", reminderDaysBefore=0
 - 如果用户提到"提醒""通知""邮件"且提供了邮箱，reminder=true
+- 未特别说明时，默认使用系统默认邮箱并启用邮件提醒
 - 日期范围（如"9月25日到27日"）要展开为多天，每天一条
 - "工作日每天"展开为该年所有工作日
 - "每天"展开为未来30天
@@ -313,7 +314,7 @@ app.post('/api/ai-chat', async (req, res) => {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
         content: m.content,
         email: m.email || DEFAULT_EMAIL,
-        reminder: m.reminder || false,
+        reminder: true,
         reminderTime: m.reminderTime || '08:00',
         reminderDaysBefore: m.reminderDaysBefore || 0,
       });
