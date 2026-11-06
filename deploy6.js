@@ -21,25 +21,29 @@ conn.on('ready', () => {
   console.log('SSH connected!');
   conn.sftp((err, sftp) => {
     if (err) { console.log('SFTP err:', err.message); conn.end(); return; }
-    let done = 0;
-    files.forEach(([local, remote]) => {
+    let index = 0;
+    const uploadNext = () => {
+      if (index >= files.length) {
+        sftp.end();
+        const cmd = `cd ${REMOTE_DIR} && docker compose build --no-cache 2>&1 && docker compose up -d --force-recreate 2>&1 && sleep 3 && curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:8080`;
+        conn.exec(cmd, (err, stream) => {
+          if (err) { console.log('exec err:', err.message); conn.end(); return; }
+          let out = '';
+          stream.on('data', d => out += d.toString());
+          stream.stderr.on('data', d => out += d.toString());
+          stream.on('close', () => { console.log(out.slice(-500)); conn.end(); });
+        });
+        return;
+      }
+
+      const [local, remote] = files[index++];
       sftp.fastPut(local, remote, (err) => {
-        done++;
         if (err) console.log(`upload ${local}: ${err.message}`);
         else console.log(`uploaded ${local}`);
-        if (done === files.length) {
-          sftp.end();
-          const cmd = `cd ${REMOTE_DIR} && docker compose up -d --build 2>&1 && sleep 3 && curl -s -o /dev/null -w "HTTP %{http_code}" http://localhost:8080`;
-          conn.exec(cmd, (err, stream) => {
-            if (err) { console.log('exec err:', err.message); conn.end(); return; }
-            let out = '';
-            stream.on('data', d => out += d.toString());
-            stream.stderr.on('data', d => out += d.toString());
-            stream.on('close', () => { console.log(out.slice(-500)); conn.end(); });
-          });
-        }
+        uploadNext();
       });
-    });
+    };
+    uploadNext();
   });
 });
 conn.on('error', err => console.log('SSH error:', err.message));
