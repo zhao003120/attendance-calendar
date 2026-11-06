@@ -513,7 +513,7 @@ function renderMemoList() {
 
 function startNewMemo() {
   editingMemoId = null;
-  showMemoForm('', '', false, '08:00', 0);
+  showMemoForm('', '', true, '08:00', 0);
 }
 
 function startEditMemo(id) {
