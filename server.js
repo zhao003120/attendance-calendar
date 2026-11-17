@@ -77,6 +77,42 @@ app.delete('/api/memos/:dateKey/:memoId', (req, res) => {
   res.json({ ok: true });
 });
 
+function parseMemoDeleteCommand(message) {
+  if (!/(删除|删掉|移除|取消).*(备忘|提醒|记录|日程)?/.test(message)) return null;
+
+  const now = new Date();
+  let dateKey = '';
+  const fullDateMatch = message.match(/(20\d{2})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})\s*日?/);
+  const monthDateMatch = message.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日?/);
+
+  if (fullDateMatch) {
+    const [, year, month, day] = fullDateMatch;
+    dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  } else if (monthDateMatch) {
+    const [, month, day] = monthDateMatch;
+    dateKey = `${now.getFullYear()}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  } else if (/今天|今日/.test(message)) {
+    dateKey = getDateKey(now);
+  } else if (/明天|明日/.test(message)) {
+    const date = new Date(now);
+    date.setDate(date.getDate() + 1);
+    dateKey = getDateKey(date);
+  }
+
+  if (!dateKey) return { error: '请提供要删除备忘的日期，例如：删除 2027-01-06 的备忘' };
+
+  const content = message
+    .replace(/删除|删掉|移除|取消/g, '')
+    .replace(/\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?/g, '')
+    .replace(/\d{1,2}\s*月\s*\d{1,2}\s*日?/g, '')
+    .replace(/今天|今日|明天|明日|的?(备忘|提醒|记录|日程)/g, '')
+    .replace(/[“”"'‘’]/g, '')
+    .replace(/^[，,：:、\s]+|[，,：:、\s]+$/g, '')
+    .trim();
+
+  return { dateKey, content };
+}
+
 app.post('/api/send-test', async (req, res) => {
   const { email, content, dateKey } = req.body;
   if (!email || !content) {
@@ -255,6 +291,34 @@ const SYSTEM_PROMPT = `你是考勤日历的智能备忘助手。用户会用自
 app.post('/api/ai-chat', async (req, res) => {
   const { message } = req.body;
   if (!message) return res.json({ ok: false, error: '消息为空' });
+
+  const deleteCommand = parseMemoDeleteCommand(message);
+  if (deleteCommand) {
+    if (deleteCommand.error) {
+      return res.json({ ok: false, error: deleteCommand.error });
+    }
+
+    const allMemos = loadMemos();
+    const existing = allMemos[deleteCommand.dateKey] || [];
+    const remaining = deleteCommand.content
+      ? existing.filter(m => !m.content.includes(deleteCommand.content))
+      : [];
+    const deleted = existing.length - remaining.length;
+
+    if (remaining.length) allMemos[deleteCommand.dateKey] = remaining;
+    else delete allMemos[deleteCommand.dateKey];
+    if (deleted) saveMemos(allMemos);
+
+    return res.json({
+      ok: true,
+      deleted,
+      affectedDates: deleted ? [deleteCommand.dateKey] : [],
+      memos: [],
+      reply: deleted
+        ? `已删除 ${deleted} 条备忘\n日期：${deleteCommand.dateKey}${deleteCommand.content ? `\n内容：${deleteCommand.content}` : ''}`
+        : `未找到 ${deleteCommand.dateKey}${deleteCommand.content ? ` 中内容包含“${deleteCommand.content}”` : ''} 的备忘`,
+    });
+  }
 
   if (!DEEPSEEK_API_KEY) {
     return res.json({ ok: false, error: 'DeepSeek API Key 未配置' });
