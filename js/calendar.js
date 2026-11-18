@@ -3,9 +3,13 @@
  * 版本：v2.0.0
  */
 
-const APP_VERSION = 'v3.2.0';
+const APP_VERSION = 'v3.4.0';
 
 const VERSION_HISTORY = [
+  { ver: 'v3.4.0', date: '2026-11-18', features: [
+    '智能助手支持按日期删除备忘',
+    '支持按备忘内容精准删除并自动刷新日历',
+  ]},
   { ver: 'v3.3.0', date: '2026-11-06', features: [
     '智能助手创建备忘自动带入默认邮箱',
     '智能助手创建备忘后立即刷新日历显示',
